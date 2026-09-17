@@ -20,7 +20,7 @@ func vscodeDesktopVariants() []model.Variant {
 		filepath.Join(home, ".local/share/applications", "*.desktop"),
 		"/usr/share/applications/*code*.desktop",
 	}
-	variants := collectVariants(desktopPatterns, "code", true, "app", "")
+	variants := collectDesktopVariants(desktopPatterns, "Visual Studio Code", "app")
 
 	// Check common package install directories for Visual Studio Code binaries or bundles.
 	variants = append(variants, collectVariants([]string{"/opt/*code*"}, "", false, "app", "")...)

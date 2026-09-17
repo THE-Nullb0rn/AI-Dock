@@ -5,7 +5,7 @@ import "github.com/THE-Nullb0rn/AI-Dock/internal/model"
 type VSCodeDetector struct{}
 
 func (VSCodeDetector) Name() string {
-	return "VS Code"
+	return "Visual Studio Code"
 }
 
 func (VSCodeDetector) Detect() []model.Tool {
@@ -21,5 +21,5 @@ func (VSCodeDetector) Detect() []model.Tool {
 
 	variants = append(variants, vscodeDesktopVariants()...)
 
-	return []model.Tool{{Name: "VS Code", Variants: variants}}
+	return []model.Tool{{Name: "Visual Studio Code", Variants: variants}}
 }

@@ -20,7 +20,7 @@ func claudeDesktopVariants() []model.Variant {
 		filepath.Join(home, ".local/share/applications", "*.desktop"),
 		"/usr/share/applications/*claude*.desktop",
 	}
-	variants := collectVariants(desktopPatterns, "claude", true, "app", "")
+	variants := collectDesktopVariants(desktopPatterns, "Claude", "app")
 
 	// Check common package install directories for Claude binaries or bundles.
 	variants = append(variants, collectVariants([]string{"/opt/*claude*"}, "", false, "app", "")...)

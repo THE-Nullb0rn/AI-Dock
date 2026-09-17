@@ -20,7 +20,7 @@ func cursorDesktopVariants() []model.Variant {
 		filepath.Join(home, ".local/share/applications", "*.desktop"),
 		"/usr/share/applications/*cursor*.desktop",
 	}
-	variants := collectVariants(desktopPatterns, "cursor", true, "ide", "")
+	variants := collectDesktopVariants(desktopPatterns, "Cursor", "ide")
 
 	// Check common package install directories for Cursor binaries or bundles.
 	variants = append(variants, collectVariants([]string{"/opt/*cursor*"}, "", false, "ide", "")...)
