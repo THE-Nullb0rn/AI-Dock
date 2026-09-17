@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/THE-Nullb0rn/AI-Dock/internal/config"
+	"github.com/THE-Nullb0rn/AI-Dock/internal/detector"
 	"github.com/THE-Nullb0rn/AI-Dock/internal/model"
 	"github.com/THE-Nullb0rn/AI-Dock/internal/ui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -16,7 +17,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tools := cfg.Tools
+	tools := filterTools(cfg.Tools)
+	if len(tools) == 0 {
+		tools = filterTools(detector.DetectAll())
+	}
 	if len(tools) == 0 {
 		tools = []model.Tool{
 			{
@@ -39,4 +43,15 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		fmt.Println("error running aidock:", err)
 	}
+}
+
+func filterTools(tools []model.Tool) []model.Tool {
+	filtered := make([]model.Tool, 0, len(tools))
+	for _, tool := range tools {
+		if len(tool.Variants) == 0 {
+			continue
+		}
+		filtered = append(filtered, tool)
+	}
+	return filtered
 }
