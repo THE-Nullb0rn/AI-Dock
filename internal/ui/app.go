@@ -13,6 +13,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ─── view / step enums ────────────────────────────────────────────────────────
+
 type view int
 
 const (
@@ -39,11 +41,26 @@ const (
 	deleteVariant
 )
 
+// ─── list item ────────────────────────────────────────────────────────────────
+
 type listItem struct{ tool model.Tool }
 
 func (i listItem) FilterValue() string { return i.tool.Name }
-func (i listItem) Title() string       { return i.tool.Name }
-func (i listItem) Description() string { return fmt.Sprintf("%d variant(s)", len(i.tool.Variants)) }
+func (i listItem) Title() string {
+	icon := ToolIcon(i.tool.Name)
+	name := ToolNameStyle.Render(i.tool.Name)
+	return icon + "  " + name
+}
+func (i listItem) Description() string {
+	n := len(i.tool.Variants)
+	label := "variant"
+	if n != 1 {
+		label = "variants"
+	}
+	return VariantCountStyle.Render(fmt.Sprintf("  %d %s", n, label))
+}
+
+// ─── Model ────────────────────────────────────────────────────────────────────
 
 type Model struct {
 	list          list.Model
@@ -63,6 +80,9 @@ type Model struct {
 	deleteTarget  deleteTarget
 	deleteToolIdx int
 	launchErr     error
+
+	// showDetails controls visibility of path/command in detail view
+	showDetails bool
 }
 
 func NewModel(cfg *config.Config) Model {
@@ -73,13 +93,22 @@ func NewModel(cfg *config.Config) Model {
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle = SelectedStyle
 	delegate.Styles.SelectedDesc = SelectedStyle
+	// Give variants a little more vertical space by bumping delegate height
+	delegate.SetHeight(2)
 	l := list.New(items, delegate, 0, 0)
-	l.Title = "Tools"
+	l.Title = " Tools"
+	l.Styles.Title = SectionHeaderStyle
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	ti := textinput.New()
 	ti.CharLimit = 256
-	return Model{list: l, tools: cfg.Tools, cfg: cfg, input: ti}
+	return Model{
+		list:        l,
+		tools:       cfg.Tools,
+		cfg:         cfg,
+		input:       ti,
+		showDetails: false,
+	}
 }
 
 func (m Model) Init() tea.Cmd { return textinput.Blink }
@@ -87,11 +116,13 @@ func (m Model) Init() tea.Cmd { return textinput.Blink }
 // LaunchError is reported by main after Bubble Tea has restored the terminal.
 func (m Model) LaunchError() error { return m.launchErr }
 
+// ─── Update ───────────────────────────────────────────────────────────────────
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.list.SetSize(msg.Width-6, msg.Height-8)
+		m.list.SetSize(msg.Width-10, msg.Height-10)
 		return m, nil
 	case tea.KeyMsg:
 		if m.adding {
@@ -116,14 +147,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.deleteTarget = deleteVariant
 				return m, nil
 			}
+		case "i":
+			if m.view == detailView {
+				m.showDetails = !m.showDetails
+				return m, nil
+			}
 		case "esc":
 			if m.view == detailView {
 				m.view = listView
+				m.showDetails = false
 				return m, nil
 			}
 		case "enter":
 			if m.view == listView && len(m.tools) > 0 {
 				m.selected, m.variantIndex, m.view = m.tools[m.list.Index()], 0, detailView
+				m.showDetails = false
 				return m, nil
 			}
 			if m.view == detailView && len(m.selected.Variants) > 0 {
@@ -150,6 +188,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// ─── Add flow ─────────────────────────────────────────────────────────────────
 
 func (m Model) updateAdd(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "esc" {
@@ -283,6 +323,8 @@ func (m Model) selectedToolIndex() int {
 	return -1
 }
 
+// ─── View ─────────────────────────────────────────────────────────────────────
+
 func (m Model) View() string {
 	var content string
 	switch {
@@ -291,14 +333,20 @@ func (m Model) View() string {
 	case m.view == detailView:
 		content = m.detailView()
 	default:
-		content = m.listView()
+		content = m.listViewContent()
 	}
-	return AppStyle.Render(lipgloss.JoinVertical(lipgloss.Left, TitleStyle.Render(" aidock "), PanelStyle.Width(max(20, m.width-6)).Render(content)))
+	panelWidth := max(30, m.width-8)
+	panel := PanelStyle.Width(panelWidth).Render(content)
+	header := TitleBadgeStyle.Render("  aidock  ")
+	return AppStyle.Render(lipgloss.JoinVertical(lipgloss.Left, header, panel))
 }
 
-func (m Model) listView() string {
+// listViewContent renders the bubbles list plus optional delete prompt.
+func (m Model) listViewContent() string {
 	if len(m.tools) == 0 {
-		return "No tools added yet.\nPress 'a' to add one, or 'q' to quit."
+		noTools := ToolNameStyle.Render("No tools added yet.")
+		hint := HelpStyle.Render("Press 'a' to add one, or 'q' to quit.")
+		return noTools + "\n" + hint
 	}
 	content := m.list.View()
 	if m.deleteTarget == deleteTool {
@@ -307,21 +355,36 @@ func (m Model) listView() string {
 	return content
 }
 
+// addView renders the multi-step add-tool form.
 func (m Model) addView() string {
 	var header, line, footer string
 	switch m.addStep {
 	case addToolName:
-		header, line, footer = "Add Tool", "Tool Name:", "Type the name, press Enter to continue. Esc to cancel."
+		header = SectionHeaderStyle.Render("Add Tool")
+		line = "Tool Name:"
+		footer = HelpStyle.Render("Type the name · Enter to continue · Esc to cancel")
 	case addVariantLabel:
-		header, line, footer = fmt.Sprintf("Add Tool: %s — New Variant", m.tempTool.Name), "Variant Label (e.g. IDE, CLI, Agentic Mode):", "Type the label, press Enter to continue. Esc to cancel."
+		header = SectionHeaderStyle.Render(fmt.Sprintf("Add Tool: %s — New Variant", m.tempTool.Name))
+		line = "Variant Label (e.g. IDE, CLI, Agentic Mode):"
+		footer = HelpStyle.Render("Type the label · Enter to continue · Esc to cancel")
 	case addLaunchCommand:
-		header, line, footer = fmt.Sprintf("Add Tool: %s — New Variant: %s", m.tempTool.Name, m.tempVariant.Label), "Launch Command or Path (e.g. cursor, /usr/bin/code, code .):", "Type the command, press Enter to continue. Esc to cancel."
+		header = SectionHeaderStyle.Render(fmt.Sprintf("Add Tool: %s — %s", m.tempTool.Name, m.tempVariant.Label))
+		line = "Launch command or path (e.g. cursor, /usr/bin/code):"
+		footer = HelpStyle.Render("Type the command · Enter to continue · Esc to cancel")
 	case addTerminalMode:
-		header, line, footer = fmt.Sprintf("Add Tool: %s — New Variant: %s", m.tempTool.Name, m.tempVariant.Label), "Does this need a terminal window to run? (y/n):", "Press y or n. Esc to cancel."
+		header = SectionHeaderStyle.Render(fmt.Sprintf("Add Tool: %s — %s", m.tempTool.Name, m.tempVariant.Label))
+		line = "Does this need a new terminal window? " + HintKeyStyle.Render("(y/n)")
+		footer = HelpStyle.Render("Press y or n · Esc to cancel")
 	case addAnotherVariant:
-		header, line, footer = fmt.Sprintf("Add Tool: %s", m.tempTool.Name), fmt.Sprintf("Variant '%s' added. Add another variant? (y/n):", variantLabel(m.tempVariant)), "Press y or n."
+		header = SectionHeaderStyle.Render(fmt.Sprintf("Add Tool: %s", m.tempTool.Name))
+		line = fmt.Sprintf("Variant '%s' added. Add another variant? "+HintKeyStyle.Render("(y/n)"), variantLabel(m.tempVariant))
+		footer = HelpStyle.Render("Press y or n")
 	case addConfirmation:
-		return fmt.Sprintf("Tool '%s' saved with %d variant(s).\n\nPress any key to return to the list.", m.tempTool.Name, len(m.tempTool.Variants))
+		msg := StatusStyle.Render(fmt.Sprintf(
+			"✓  Tool '%s' saved with %d variant(s).",
+			m.tempTool.Name, len(m.tempTool.Variants),
+		))
+		return msg + "\n\n" + HelpStyle.Render("Press any key to return to the list.")
 	}
 	if m.addStep == addTerminalMode || m.addStep == addAnotherVariant {
 		return strings.Join([]string{header, "", line, "", footer}, "\n")
@@ -329,22 +392,68 @@ func (m Model) addView() string {
 	return strings.Join([]string{header, "", line, m.input.View(), "", footer}, "\n")
 }
 
+// detailView renders the tool detail / variant selection pane.
 func (m Model) detailView() string {
 	var b strings.Builder
-	b.WriteString(TitleStyle.Render(m.selected.Name))
+
+	// Tool heading
+	icon := ToolIcon(m.selected.Name)
+	heading := DetailToolNameStyle.Render(icon + "  " + m.selected.Name)
+	b.WriteString(heading)
 	b.WriteString("\n\n")
+
+	divider := DividerStyle.Render(strings.Repeat("─", 36))
+
 	for i, variant := range m.selected.Variants {
-		marker := " "
-		if i == m.variantIndex {
-			marker = ">"
+		isSelected := i == m.variantIndex
+
+		// Marker
+		marker := "  "
+		if isSelected {
+			marker = DetailSelectedMarker.Render("▶ ")
 		}
-		fmt.Fprintf(&b, "%s %s %s\n", marker, DetailLabelStyle.Render(fmt.Sprintf("Variant %d", i+1)), variantLabel(variant))
-		fmt.Fprintf(&b, "  path: %s\n  command: %s\n", variant.Path, variant.LaunchCmd)
+
+		// Icon + label
+		vIcon := ToolIcon(m.selected.Name)
+		label := variantLabel(variant)
+		var labelStr string
+		if isSelected {
+			labelStr = DetailLabelStyle.Render(label)
+		} else {
+			labelStr = VariantCountStyle.Render(label)
+		}
+
+		b.WriteString(marker + vIcon + "  " + labelStr + "\n")
+
+		// Expanded details (only for selected variant when showDetails=true)
+		if isSelected && m.showDetails {
+			b.WriteString(DetailMetaStyle.Render("path:    "+variant.Path) + "\n")
+			if variant.LaunchCmd != "" {
+				b.WriteString(DetailMetaStyle.Render("command: "+variant.LaunchCmd) + "\n")
+			}
+		}
+
+		// Subtle divider between variants
+		if i < len(m.selected.Variants)-1 {
+			b.WriteString(divider + "\n")
+		}
 	}
-	b.WriteString("\nUse up/down to choose a variant. Press enter to launch it.\n")
+
+	// Footer
+	b.WriteString("\n")
+	navHint := HelpStyle.Render("↑↓ choose variant  ·  enter launch  ·  d delete  ·  esc back")
+	var detailHint string
+	if m.showDetails {
+		detailHint = HelpStyle.Render(HintKeyStyle.Render("i") + " hide details")
+	} else {
+		detailHint = HelpStyle.Render(HintKeyStyle.Render("i") + " toggle details")
+	}
+	b.WriteString(navHint + "  " + detailHint + "\n")
+
 	if m.deleteTarget == deleteVariant {
-		fmt.Fprintf(&b, "\nDelete variant '%s'? (y/n):", variantLabel(m.selected.Variants[m.variantIndex]))
+		b.WriteString("\n" + fmt.Sprintf("Delete variant '%s'? (y/n):", variantLabel(m.selected.Variants[m.variantIndex])))
 	}
+
 	return b.String()
 }
 
@@ -354,6 +463,8 @@ func (m Model) deletePrompt() string {
 	}
 	return ""
 }
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 func resolveLaunchMode(v model.Variant) string {
 	if v.LaunchMode != "" {
