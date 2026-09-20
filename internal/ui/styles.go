@@ -28,4 +28,6 @@ var (
 				Bold(true)
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(mutedColor)
+	StatusStyle = lipgloss.NewStyle().
+			Foreground(accentColor)
 )
