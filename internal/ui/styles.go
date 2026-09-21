@@ -22,15 +22,15 @@ type Styles struct {
 	SectionTitle lipgloss.Style // icon + "YOUR AI TOOLS" bold accent
 	SectionStats lipgloss.Style // "<N> tools | <M> interfaces" muted
 
-	// Cards (solid background fills, NO outer card borders)
-	Card           lipgloss.Style // unselected card
-	CardSelected   lipgloss.Style // selected card
+	// Cards – bordered approach (no solid background fills)
+	Card           lipgloss.Style // unselected card (subtle border)
+	CardSelected   lipgloss.Style // selected card (accent border)
 	CardTitle      lipgloss.Style // tool name on unselected card
 	CardTitleSel   lipgloss.Style // tool name on selected card
 	CardDesc       lipgloss.Style // description on unselected card
 	CardDescSel    lipgloss.Style // description on selected card
-	CardTagPill    lipgloss.Style // small rounded border pill for variant label
-	CardTagPillSel lipgloss.Style // small rounded border pill on selected card
+	CardTagPill    lipgloss.Style // plain-text tag for variant label
+	CardTagPillSel lipgloss.Style // plain-text tag on selected card
 	CardCount      lipgloss.Style // "<N> interfaces"
 	CardCountSel   lipgloss.Style // "<N> interfaces" on selected
 	CardArrow      lipgloss.Style // "→"
@@ -38,8 +38,8 @@ type Styles struct {
 	StarMarker     lipgloss.Style // "★" on selected card
 
 	// Footer
-	FooterKeyPill lipgloss.Style // small rounded border pill for keys
-	FooterAction  lipgloss.Style // action text next to key pill
+	FooterKeyPill lipgloss.Style // key label in footer
+	FooterAction  lipgloss.Style // action text next to key
 	FooterTagline lipgloss.Style // "AIDock | Terminal powered. AI everywhere."
 
 	// Detail view
@@ -71,8 +71,6 @@ var ActiveStyles Styles
 
 // ApplyTheme rebuilds ActiveStyles from the given theme.
 func ApplyTheme(t Theme) {
-	cardWidth := 34
-
 	ActiveStyles = Styles{
 		// ── outer layout ──────────────────────────────────────────────────
 		App:   lipgloss.NewStyle().Padding(1, 2),
@@ -118,17 +116,18 @@ func ApplyTheme(t Theme) {
 			Bold(true).
 			Foreground(t.Accent),
 
-		// ── cards (solid fill, NO outer border) ───────────────────────────
+		// ── cards (bordered, NO solid background fills) ───────────────────
+		// Unselected: subtle muted border, no background
 		Card: lipgloss.NewStyle().
-			Background(t.CardBg).
-			Width(cardWidth).
-			Padding(1, 2),
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.MutedText).
+			Padding(0, 1),
 
+		// Selected: accent border, no solid background fill
 		CardSelected: lipgloss.NewStyle().
-			Background(t.CardBgSelected).
-			Foreground(t.TextSelected).
-			Width(cardWidth).
-			Padding(1, 2),
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.Accent).
+			Padding(0, 1),
 
 		CardTitle: lipgloss.NewStyle().
 			Bold(true).
@@ -136,49 +135,43 @@ func ApplyTheme(t Theme) {
 
 		CardTitleSel: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(t.TextSelected),
+			Foreground(t.Accent),
 
 		CardDesc: lipgloss.NewStyle().
 			Foreground(t.MutedText),
 
 		CardDescSel: lipgloss.NewStyle().
-			Foreground(t.TextSelected),
+			Foreground(t.Text),
 
+		// Tags: plain-text bracket style [IDE] — no nested borders
 		CardTagPill: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.Accent).
-			Foreground(t.Text).
-			Padding(0, 1),
+			Foreground(t.MutedText),
 
 		CardTagPillSel: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.TextSelected).
-			Foreground(t.TextSelected).
-			Padding(0, 1),
+			Foreground(t.Accent).
+			Bold(true),
 
 		CardCount: lipgloss.NewStyle().
 			Foreground(t.MutedText),
 
 		CardCountSel: lipgloss.NewStyle().
-			Foreground(t.TextSelected),
+			Foreground(t.Text),
 
 		CardArrow: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(t.Accent),
+			Foreground(t.MutedText),
 
 		CardArrowSel: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(t.TextSelected),
+			Foreground(t.Accent),
 
 		StarMarker: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FFD700")),
+			Foreground(t.Accent),
 
-		// ── footer ───────────────────────────────────────────────────────
+		// ── footer (compact inline style) ────────────────────────────────
 		FooterKeyPill: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.Accent).
-			Foreground(t.Text).
+			Foreground(t.Accent).
 			Bold(true),
 
 		FooterAction: lipgloss.NewStyle().
@@ -237,7 +230,7 @@ func ApplyTheme(t Theme) {
 
 		CardNameSel: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(t.TextSelected),
+			Foreground(t.Accent),
 	}
 }
 

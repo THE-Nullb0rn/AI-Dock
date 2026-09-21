@@ -16,8 +16,12 @@ import (
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const (
-	cardW   = 34 // solid fill card width (chars)
-	cardGap = 2  // horizontal gap between cards
+	cardMinW = 36 // minimum card width (chars, including border)
+	cardGap  = 2  // horizontal gap between cards
+
+	// cardW is kept as a package-level alias used by calcCols; it equals
+	// cardMinW so existing column-calculation tests (if any) stay green.
+	cardW = cardMinW
 )
 
 // ─── tick message ─────────────────────────────────────────────────────────────
@@ -125,7 +129,7 @@ func (m Model) LaunchError() error { return m.launchErr }
 
 func calcCols(termWidth int) int {
 	available := termWidth - 4 // outer padding: 2 on left, 2 on right
-	each := cardW + cardGap
+	each := cardMinW + cardGap
 	c := (available + cardGap) / each
 	if c < 1 {
 		c = 1
@@ -450,41 +454,30 @@ func (m Model) renderHeader(availW int) string {
 	icon := s.HeaderIcon.Render("◈")
 	title := s.HeaderTitle.Render("AIDock")
 	version := s.HeaderVersion.Render("v0.1.0")
-	leftRow1 := icon + "  " + title + "  " + version
+	subtitle := s.HeaderSubtitle.Render("Your AI tools, in one place.")
+	leftPart := icon + " " + title + " " + version + "  " + subtitle
 
-	// Subtitle line below
-	leftRow2 := s.HeaderSubtitle.Render("Your AI tools, in one place.")
-
-	// Right: Date + Time
+	// Right: Date + Time + Tagline
 	now := m.currentTime
 	if now.IsZero() {
 		now = time.Now()
 	}
 	dateStr := s.HeaderDate.Render(now.Format("Mon, 02 Jan 2006"))
 	timeStr := s.HeaderTime.Render(now.Format("15:04:05"))
-	rightRow1 := dateStr + "   " + timeStr
+	tagline := s.HeaderTagline.Render("Build faster with AI.")
+	rightPart := tagline + "  " + dateStr + " " + timeStr
 
-	// Tagline below date/time
-	rightRow2 := s.HeaderTagline.Render("Build faster with AI.")
-
-	// Spacing row 1
-	gap1 := availW - lipgloss.Width(leftRow1) - lipgloss.Width(rightRow1)
-	if gap1 < 2 {
-		gap1 = 2
+	// Single row header
+	gap := availW - lipgloss.Width(leftPart) - lipgloss.Width(rightPart)
+	if gap < 2 {
+		gap = 2
 	}
-	row1 := leftRow1 + strings.Repeat(" ", gap1) + rightRow1
-
-	// Spacing row 2
-	gap2 := availW - lipgloss.Width(leftRow2) - lipgloss.Width(rightRow2)
-	if gap2 < 2 {
-		gap2 = 2
-	}
-	row2 := leftRow2 + strings.Repeat(" ", gap2) + rightRow2
+	headerRow := leftPart + strings.Repeat(" ", gap) + rightPart
 
 	// Horizontal divider line
 	divider := s.Divider.Render(strings.Repeat("─", availW))
 
-	return row1 + "\n" + row2 + "\n\n" + divider
+	return headerRow + "\n" + divider
 }
 
 // ─── Section Label ────────────────────────────────────────────────────────────
@@ -539,9 +532,12 @@ func (m Model) renderDashboard() string {
 			cols = 1
 		}
 
+		// Calculate card width: fill available space evenly
+		cw := m.calcCardWidth(cols, availW)
+
 		cards := make([]string, len(m.tools))
 		for i, tool := range m.tools {
-			cards[i] = m.renderCard(tool, i == m.gridCursor)
+			cards[i] = m.renderCard(tool, i == m.gridCursor, cw)
 		}
 
 		var rows []string
@@ -553,42 +549,74 @@ func (m Model) renderDashboard() string {
 			var rowCards []string
 			for c := rowStart; c < end; c++ {
 				if c > rowStart {
-					rowCards = append(rowCards, "  ")
+					rowCards = append(rowCards, strings.Repeat(" ", cardGap))
 				}
 				rowCards = append(rowCards, cards[c])
 			}
 			row := lipgloss.JoinHorizontal(lipgloss.Top, rowCards...)
 			rows = append(rows, row)
 		}
-		mainContent = strings.Join(rows, "\n\n")
+		mainContent = strings.Join(rows, "\n")
 	}
 
 	footer := m.renderFooter(availW)
 
 	var b strings.Builder
-	b.WriteString(header + "\n\n")
+	b.WriteString(header + "\n")
 	b.WriteString(section + "\n\n")
-	b.WriteString(mainContent + "\n\n")
+	b.WriteString(mainContent + "\n")
 	if m.deleteTarget == deleteTool {
-		b.WriteString(m.deletePrompt() + "\n\n")
+		b.WriteString("\n" + m.deletePrompt() + "\n")
 	}
-	b.WriteString(footer)
+	b.WriteString("\n" + footer)
 
 	return b.String()
 }
 
+// calcCardWidth computes the width each card should use to fill the available
+// terminal space evenly across the given number of columns.
+func (m Model) calcCardWidth(cols, availW int) int {
+	if cols <= 0 {
+		cols = 1
+	}
+	totalGaps := (cols - 1) * cardGap
+	cw := (availW - totalGaps) / cols
+	if cw < cardMinW {
+		cw = cardMinW
+	}
+	return cw
+}
+
 // ─── Card Rendering ───────────────────────────────────────────────────────────
+//
+// Key design: Cards use Lip Gloss borders only. No background fills. All child
+// content is composed as plain styled text (no nested bordered/background
+// Lip Gloss containers) to avoid ANSI escape corruption.
 
-func (m Model) renderCard(tool model.Tool, isSelected bool) string {
+func (m Model) renderCard(tool model.Tool, isSelected bool, cardWidth ...int) string {
 	s := ActiveStyles
-	innerW := cardW - 4 // 34 - 4 = 30 chars inner width
 
-	currentTheme := ThemeByName(m.cfg.Theme)
+	// Determine card width. The variadic cardWidth lets the existing test
+	// signature `renderCard(tool, bool)` keep working without a width arg.
+	cw := cardMinW
+	if len(cardWidth) > 0 && cardWidth[0] > 0 {
+		cw = cardWidth[0]
+	}
 
-	// Top row: Tool Icon + Name on left, Star marker on right
+	// The border takes 2 chars on each side (left+right), padding is 1 each side
+	// Total overhead for content = border(2) + padding(2) = 4
+	// But lipgloss Width() on a border style sets the *outer* width including
+	// the border. Padding(0,1) adds 1 char each side inside the border.
+	// So inner content width = cw - 2 (border) - 2 (padding) = cw - 4
+	innerW := cw - 4
+	if innerW < 10 {
+		innerW = 10
+	}
+
+	// ── Row 1: Icon + Tool Name ──────────────────────────────────────────
 	var iconGlyph string
 	if isSelected {
-		iconGlyph = lipgloss.NewStyle().Foreground(currentTheme.TextSelected).Render(ToolGlyph(tool.Name))
+		iconGlyph = s.CardTitleSel.Render(ToolGlyph(tool.Name))
 	} else {
 		iconGlyph = ToolIcon(tool.Name)
 	}
@@ -600,15 +628,11 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 		nameText = s.CardTitle.Render(tool.Name)
 	}
 
-	leftTitle := iconGlyph + "  " + nameText
+	leftTitle := iconGlyph + " " + nameText
 
 	star := " "
 	if isSelected {
-		if currentTheme.Name == "Monochrome" {
-			star = lipgloss.NewStyle().Foreground(currentTheme.TextSelected).Bold(true).Render("★")
-		} else {
-			star = s.StarMarker.Render("★")
-		}
+		star = s.StarMarker.Render("★")
 	}
 
 	gapTitle := innerW - lipgloss.Width(leftTitle) - lipgloss.Width(star)
@@ -623,7 +647,7 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 		} else {
 			nameText = s.CardTitle.Render(truncatedName)
 		}
-		leftTitle = iconGlyph + "  " + nameText
+		leftTitle = iconGlyph + " " + nameText
 		gapTitle = innerW - lipgloss.Width(leftTitle) - lipgloss.Width(star)
 		if gapTitle < 1 {
 			gapTitle = 1
@@ -631,7 +655,7 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 	}
 	titleRow := leftTitle + strings.Repeat(" ", gapTitle) + star
 
-	// Description row
+	// ── Row 2: Description ───────────────────────────────────────────────
 	desc := tool.Description
 	if desc == "" {
 		desc = "AI tool"
@@ -644,34 +668,34 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 		descRow = s.CardDesc.Render(desc)
 	}
 
-	// Variant tag pills row
-	pillStyle := s.CardTagPill
+	// ── Row 3: Variant tags as plain text [ TAG ] ────────────────────────
+	tagStyle := s.CardTagPill
 	if isSelected {
-		pillStyle = s.CardTagPillSel
+		tagStyle = s.CardTagPillSel
 	}
 
-	var pills []string
+	var tagParts []string
 	curW := 0
 	for _, v := range tool.Variants {
 		lbl := variantLabel(v)
-		p := pillStyle.Render(lbl)
-		pw := lipgloss.Width(p)
-		if curW > 0 && curW+1+pw > innerW {
+		rendered := tagStyle.Render("[ " + lbl + " ]")
+		tw := lipgloss.Width(rendered)
+		if curW > 0 && curW+1+tw > innerW {
 			break
 		}
 		if curW > 0 {
-			pills = append(pills, " ")
+			tagParts = append(tagParts, " ")
 			curW += 1
 		}
-		pills = append(pills, p)
-		curW += pw
+		tagParts = append(tagParts, rendered)
+		curW += tw
 	}
-	if len(pills) == 0 {
-		pills = append(pills, pillStyle.Render("default"))
+	if len(tagParts) == 0 {
+		tagParts = append(tagParts, tagStyle.Render("[ default ]"))
 	}
-	pillsRow := lipgloss.JoinHorizontal(lipgloss.Top, pills...)
+	tagsRow := strings.Join(tagParts, "")
 
-	// Bottom row: interface count on left, "→" on right
+	// ── Row 4: Interface count + arrow ───────────────────────────────────
 	n := len(tool.Variants)
 	interfaceWord := "interfaces"
 	if n == 1 {
@@ -698,29 +722,29 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 	}
 	bottomRow := leftCount + strings.Repeat(" ", gapBottom) + rightArrow
 
-	// Ensure every inner line is padded to the same inner width so the
-	// outer Card/CardSelected background fills the full card rectangle
-	innerStyle := lipgloss.NewStyle().Width(innerW)
-
-	paddedTitle := innerStyle.Render(titleRow)
-	paddedDesc := innerStyle.Render(descRow)
-	paddedEmpty := innerStyle.Render("")
-	paddedPills := innerStyle.Render(pillsRow)
-	paddedBottom := innerStyle.Render(bottomRow)
-
-	cardContent := lipgloss.JoinVertical(lipgloss.Left,
-		paddedTitle,
-		paddedDesc,
-		paddedEmpty,
-		paddedPills,
-		paddedEmpty,
-		paddedBottom,
-	)
-
-	if isSelected {
-		return s.CardSelected.Render(cardContent)
+	// ── Assemble inner lines with uniform width ──────────────────────────
+	padLine := func(line string) string {
+		w := lipgloss.Width(line)
+		if w < innerW {
+			return line + strings.Repeat(" ", innerW-w)
+		}
+		return line
 	}
-	return s.Card.Render(cardContent)
+
+	cardContent := strings.Join([]string{
+		padLine(titleRow),
+		padLine(descRow),
+		padLine(tagsRow),
+		padLine(bottomRow),
+	}, "\n")
+
+	// ── Apply outer card style (border only, no fill) ────────────────────
+	cardStyle := s.Card.Width(cw - 2) // -2 for border chars
+	if isSelected {
+		cardStyle = s.CardSelected.Width(cw - 2)
+	}
+
+	return cardStyle.Render(cardContent)
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
@@ -728,40 +752,42 @@ func (m Model) renderCard(tool model.Tool, isSelected bool) string {
 func (m Model) renderFooter(availW int) string {
 	s := ActiveStyles
 
-	renderKeyItem := func(key, action string) string {
-		pill := s.FooterKeyPill.Render(key)
-		act := s.FooterAction.Render(action)
-		return lipgloss.JoinHorizontal(lipgloss.Center, pill, " ", act)
-	}
+	// Divider above footer
+	divider := s.Divider.Render(strings.Repeat("─", availW))
 
-	var items []string
-	items = append(items, renderKeyItem("↑↓", "navigate"))
-	items = append(items, renderKeyItem("←→", "navigate"))
-	items = append(items, renderKeyItem("Enter", "open"))
-	items = append(items, renderKeyItem("a", "add"))
+	// Compact key hints: key action · key action · ...
+	type keyAction struct {
+		key, action string
+	}
+	keys := []keyAction{
+		{"↑↓←→", "navigate"},
+		{"enter", "open"},
+		{"a", "add"},
+	}
 	if len(m.tools) > 0 {
-		items = append(items, renderKeyItem("d", "delete"))
+		keys = append(keys, keyAction{"d", "delete"})
 	}
-	items = append(items, renderKeyItem("t", "theme"))
-	items = append(items, renderKeyItem("?", "help"))
-	items = append(items, renderKeyItem("q", "quit"))
+	keys = append(keys, keyAction{"t", "theme"})
+	keys = append(keys, keyAction{"?", "help"})
+	keys = append(keys, keyAction{"q", "quit"})
 
-	var leftItems []string
-	for i, it := range items {
-		if i > 0 {
-			leftItems = append(leftItems, "  ")
-		}
-		leftItems = append(leftItems, it)
+	var parts []string
+	for _, ka := range keys {
+		parts = append(parts, s.FooterKeyPill.Render(ka.key)+" "+s.FooterAction.Render(ka.action))
 	}
-	left := lipgloss.JoinHorizontal(lipgloss.Center, leftItems...)
+	left := strings.Join(parts, s.Divider.Render(" · "))
 
 	tagline := s.FooterTagline.Render("AIDock | Terminal powered. AI everywhere.")
 
 	gap := availW - lipgloss.Width(left) - lipgloss.Width(tagline)
+	var footerRow string
 	if gap >= 2 {
-		return lipgloss.JoinHorizontal(lipgloss.Center, left, strings.Repeat(" ", gap), tagline)
+		footerRow = left + strings.Repeat(" ", gap) + tagline
+	} else {
+		footerRow = left + "\n" + tagline
 	}
-	return left + "\n" + tagline
+
+	return divider + "\n" + footerRow
 }
 
 // ─── Help View ────────────────────────────────────────────────────────────────

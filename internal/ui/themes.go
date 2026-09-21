@@ -5,7 +5,7 @@ import "github.com/charmbracelet/lipgloss"
 // Theme holds the full color palette for a visual theme.
 type Theme struct {
 	Name           string
-	Border         lipgloss.Color // kept for backward compatibility if referenced
+	Border         lipgloss.Color // card/section borders
 	Accent         lipgloss.Color // active / highlighted text
 	Selected       lipgloss.Color // selected marker / text
 	Text           lipgloss.Color // primary content text
@@ -15,6 +15,7 @@ type Theme struct {
 	CardBgSelected lipgloss.Color // bright background fill for selected card
 	TextSelected   lipgloss.Color // high-contrast text color on selected card
 	MutedSelected  lipgloss.Color // high-contrast muted text on selected card
+	SurfaceBg      lipgloss.Color // slightly lighter surface for card interiors
 }
 
 // Themes is the ordered list of built-in themes.
@@ -31,6 +32,7 @@ var Themes = []Theme{
 		CardBgSelected: lipgloss.Color("#6A44D4"),
 		TextSelected:   lipgloss.Color("#FFFFFF"),
 		MutedSelected:  lipgloss.Color("#D4C4FF"),
+		SurfaceBg:      lipgloss.Color("#252240"),
 	},
 	{
 		Name:           "Cyberpunk",
@@ -44,6 +46,7 @@ var Themes = []Theme{
 		CardBgSelected: lipgloss.Color("#FF2E88"),
 		TextSelected:   lipgloss.Color("#FFFFFF"),
 		MutedSelected:  lipgloss.Color("#FFD6E8"),
+		SurfaceBg:      lipgloss.Color("#1F0F25"),
 	},
 	{
 		Name:           "Nord",
@@ -57,6 +60,7 @@ var Themes = []Theme{
 		CardBgSelected: lipgloss.Color("#5E81AC"),
 		TextSelected:   lipgloss.Color("#ECEFF4"),
 		MutedSelected:  lipgloss.Color("#D8DEE9"),
+		SurfaceBg:      lipgloss.Color("#3B4252"),
 	},
 	{
 		Name:           "Dracula",
@@ -70,6 +74,7 @@ var Themes = []Theme{
 		CardBgSelected: lipgloss.Color("#BD93F9"),
 		TextSelected:   lipgloss.Color("#282A36"),
 		MutedSelected:  lipgloss.Color("#44475A"),
+		SurfaceBg:      lipgloss.Color("#313345"),
 	},
 	{
 		Name:           "Monochrome",
@@ -83,6 +88,7 @@ var Themes = []Theme{
 		CardBgSelected: lipgloss.Color("#FFFFFF"),
 		TextSelected:   lipgloss.Color("#000000"),
 		MutedSelected:  lipgloss.Color("#555555"),
+		SurfaceBg:      lipgloss.Color("#222222"),
 	},
 }
 
