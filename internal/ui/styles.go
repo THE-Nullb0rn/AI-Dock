@@ -2,101 +2,245 @@ package ui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Palette — cohesive violet/teal/neutral theme
-var (
-	colorPrimary  = lipgloss.Color("#7D56F4") // violet  — brand
-	colorAccent   = lipgloss.Color("#04B575") // mint    — positive/active
-	colorMuted    = lipgloss.Color("#555566") // dark slate — secondary text
-	colorSubtle   = lipgloss.Color("#9090A8") // lighter muted — hints/counts
-	colorSelected = lipgloss.Color("#9F79FF") // lighter violet — selected highlight bg
-	colorDivider  = lipgloss.Color("#2A2A3A") // near-black — subtle separators
-	colorBorder   = lipgloss.Color("#6A44D4") // slightly deeper violet border
-	colorText     = lipgloss.Color("#E8E6F0") // near-white — primary text
-	colorBg       = lipgloss.Color("#1A1A2E") // very dark blue-black — selected bg
-)
+// Styles is a compiled set of lipgloss styles built from a Theme.
+type Styles struct {
+	// Outer layout
+	App   lipgloss.Style
+	Panel lipgloss.Style
 
-var (
-	// AppStyle — outer shell with generous breathing room
-	AppStyle = lipgloss.NewStyle().
-		Padding(1, 2)
+	// Header Bar
+	HeaderIcon     lipgloss.Style // large/bold icon
+	HeaderTitle    lipgloss.Style // "AIDock" bold text
+	HeaderVersion  lipgloss.Style // "v0.1.0"
+	HeaderSubtitle lipgloss.Style // "Your AI tools, in one place."
+	HeaderDate     lipgloss.Style // date string
+	HeaderTime     lipgloss.Style // time string
+	HeaderTagline  lipgloss.Style // "Build faster with AI."
+	Divider        lipgloss.Style // repeated "─"
 
-	// TitleBadgeStyle — "aidock" pill in the header
-	TitleBadgeStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FFFDF5")).
-		Background(colorPrimary).
-		Padding(0, 2).
-		MarginBottom(1)
+	// Section Label
+	SectionTitle lipgloss.Style // icon + "YOUR AI TOOLS" bold accent
+	SectionStats lipgloss.Style // "<N> tools | <M> interfaces" muted
 
-	// SectionHeaderStyle — "Tools", "Add Tool" section titles
-	SectionHeaderStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorPrimary).
-		MarginBottom(0)
+	// Cards (solid background fills, NO outer card borders)
+	Card           lipgloss.Style // unselected card
+	CardSelected   lipgloss.Style // selected card
+	CardTitle      lipgloss.Style // tool name on unselected card
+	CardTitleSel   lipgloss.Style // tool name on selected card
+	CardDesc       lipgloss.Style // description on unselected card
+	CardDescSel    lipgloss.Style // description on selected card
+	CardTagPill    lipgloss.Style // small rounded border pill for variant label
+	CardTagPillSel lipgloss.Style // small rounded border pill on selected card
+	CardCount      lipgloss.Style // "<N> interfaces"
+	CardCountSel   lipgloss.Style // "<N> interfaces" on selected
+	CardArrow      lipgloss.Style // "→"
+	CardArrowSel   lipgloss.Style // "→" on selected
+	StarMarker     lipgloss.Style // "★" on selected card
 
-	// PanelStyle — main content box with rounded violet border + inner padding
-	PanelStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(colorBorder).
-		Padding(1, 3)
+	// Footer
+	FooterKeyPill lipgloss.Style // small rounded border pill for keys
+	FooterAction  lipgloss.Style // action text next to key pill
+	FooterTagline lipgloss.Style // "AIDock | Terminal powered. AI everywhere."
 
-	// SelectedStyle — list-item highlight: filled bg + bold white text
-	SelectedStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(colorBg).
-		Bold(true).
-		Padding(0, 1)
+	// Detail view
+	DetailTitle          lipgloss.Style
+	DetailLabel          lipgloss.Style
+	DetailLabelSel       lipgloss.Style
+	DetailSelectedMarker lipgloss.Style
+	DetailMeta           lipgloss.Style
 
-	// ToolNameStyle — primary bright name in list
-	ToolNameStyle = lipgloss.NewStyle().
-		Foreground(colorText).
-		Bold(true)
+	// Theme picker
+	PickerCurrent  lipgloss.Style // current theme: bold + accent
+	PickerSelected lipgloss.Style // marker "▶ "
+	PickerItem     lipgloss.Style // other theme names
 
-	// VariantCountStyle — muted "N variants" in list
-	VariantCountStyle = lipgloss.NewStyle().
-		Foreground(colorSubtle)
+	// General hints / status
+	Help          lipgloss.Style
+	HintKey       lipgloss.Style
+	Status        lipgloss.Style
+	SectionHeader lipgloss.Style
 
-	// DetailToolNameStyle — tool heading inside detail view
-	DetailToolNameStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(colorText).
-		Background(colorPrimary).
-		Padding(0, 1).
-		MarginBottom(1)
+	// Legacy aliases
+	CardName     lipgloss.Style
+	CardNameSel  lipgloss.Style
+	CardCountOld lipgloss.Style
+}
 
-	// DetailLabelStyle — variant label text (bold accent)
-	DetailLabelStyle = lipgloss.NewStyle().
-		Foreground(colorAccent).
-		Bold(true)
+// ActiveStyles is the package-level singleton rebuilt by ApplyTheme.
+var ActiveStyles Styles
 
-	// DetailSelectedMarker — "▶" prefix for the active variant
-	DetailSelectedMarker = lipgloss.NewStyle().
-		Foreground(colorSelected).
-		Bold(true)
+// ApplyTheme rebuilds ActiveStyles from the given theme.
+func ApplyTheme(t Theme) {
+	cardWidth := 34
 
-	// DetailMetaStyle — path / command lines (shown when details are expanded)
-	DetailMetaStyle = lipgloss.NewStyle().
-		Foreground(colorMuted).
-		PaddingLeft(4)
+	ActiveStyles = Styles{
+		// ── outer layout ──────────────────────────────────────────────────
+		App:   lipgloss.NewStyle().Padding(1, 2),
+		Panel: lipgloss.NewStyle(), // no outer border
 
-	// DividerStyle — subtle horizontal rule between variants
-	DividerStyle = lipgloss.NewStyle().
-		Foreground(colorDivider)
+		// ── header bar ────────────────────────────────────────────────────
+		HeaderIcon: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
 
-	// HelpStyle — footer keybinding hints, clearly secondary
-	HelpStyle = lipgloss.NewStyle().
-		Foreground(colorMuted).
-		Italic(true)
+		HeaderTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Text),
 
-	// HintKeyStyle — the key name part of a hint, slightly brighter
-	HintKeyStyle = lipgloss.NewStyle().
-		Foreground(colorSubtle).
-		Bold(true)
+		HeaderVersion: lipgloss.NewStyle().
+			Foreground(t.MutedText),
 
-	// StatusStyle — status/info messages
-	StatusStyle = lipgloss.NewStyle().
-		Foreground(colorAccent)
+		HeaderSubtitle: lipgloss.NewStyle().
+			Foreground(t.MutedText),
 
-	// TitleStyle kept for backward compat inside add/detail text renders
-	TitleStyle = DetailToolNameStyle
-)
+		HeaderDate: lipgloss.NewStyle().
+			Foreground(t.Text),
+
+		HeaderTime: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		HeaderTagline: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		Divider: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		// ── section label ─────────────────────────────────────────────────
+		SectionTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		SectionStats: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		SectionHeader: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		// ── cards (solid fill, NO outer border) ───────────────────────────
+		Card: lipgloss.NewStyle().
+			Background(t.CardBg).
+			Width(cardWidth).
+			Padding(1, 2),
+
+		CardSelected: lipgloss.NewStyle().
+			Background(t.CardBgSelected).
+			Foreground(t.TextSelected).
+			Width(cardWidth).
+			Padding(1, 2),
+
+		CardTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Text),
+
+		CardTitleSel: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.TextSelected),
+
+		CardDesc: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		CardDescSel: lipgloss.NewStyle().
+			Foreground(t.TextSelected),
+
+		CardTagPill: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.Accent).
+			Foreground(t.Text).
+			Padding(0, 1),
+
+		CardTagPillSel: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.TextSelected).
+			Foreground(t.TextSelected).
+			Padding(0, 1),
+
+		CardCount: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		CardCountSel: lipgloss.NewStyle().
+			Foreground(t.TextSelected),
+
+		CardArrow: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		CardArrowSel: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.TextSelected),
+
+		StarMarker: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFD700")),
+
+		// ── footer ───────────────────────────────────────────────────────
+		FooterKeyPill: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.Accent).
+			Foreground(t.Text).
+			Bold(true),
+
+		FooterAction: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		FooterTagline: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		// ── detail view ──────────────────────────────────────────────────
+		DetailTitle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Text),
+
+		DetailLabel: lipgloss.NewStyle().
+			Foreground(t.Text),
+
+		DetailLabelSel: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		DetailSelectedMarker: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Selected),
+
+		DetailMeta: lipgloss.NewStyle().
+			Foreground(t.MutedText).
+			PaddingLeft(4),
+
+		// ── theme picker ─────────────────────────────────────────────────
+		PickerCurrent: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Accent),
+
+		PickerSelected: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Selected),
+
+		PickerItem: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		// ── misc ─────────────────────────────────────────────────────────
+		Help: lipgloss.NewStyle().
+			Foreground(t.MutedText),
+
+		HintKey: lipgloss.NewStyle().
+			Foreground(t.Text).
+			Bold(true),
+
+		Status: lipgloss.NewStyle().
+			Foreground(t.Accent),
+
+		// Aliases
+		CardName: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.Text),
+
+		CardNameSel: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(t.TextSelected),
+	}
+}
+
+func init() {
+	ApplyTheme(Themes[0])
+}

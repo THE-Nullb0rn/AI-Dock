@@ -9,19 +9,19 @@ import (
 // ToolIcons maps known tool names to Nerd Font glyphs.
 // Falls back to a generic glyph for unknown tools.
 var ToolIcons = map[string]string{
-	"Cursor":            "\ue795", // nf-dev-terminal
-	"Google Antigravity": "\uf135", // nf-fa-rocket
-	"GitHub Copilot":    "\ue709", // nf-dev-github
-	"ChatGPT Desktop":   "\uf4fb", // nf-md-robot (U+F4FB)
-	"Ollama":            "\uf1b2", // nf-fa-cube
-	"Claude":            "\U000F0760", // nf-md-brain-outline
-	"VS Code":           "\ue70c", // nf-dev-visualstudio
-	"Neovim":            "\ue6ae", // nf-dev-vim
-	"Zed":               "\uf489", // nf-md-alpha-z-box (approx)
-	"Windsurf":          "\uf72c", // nf-md-waves (approx)
-	"Cline":             "\ue795", // nf-dev-terminal (generic CLI)
-	"Continue":          "\uf138", // nf-fa-chevron-circle-right
-	"Aider":             "\uf013", // nf-fa-cog
+	"Cursor":             "\ue795",     // nf-dev-terminal
+	"Google Antigravity": "\uf135",     // nf-fa-rocket
+	"GitHub Copilot":     "\ue709",     // nf-dev-github
+	"ChatGPT Desktop":    "\uf4fb",     // nf-md-robot (U+F4FB)
+	"Ollama":             "\uf1b2",     // nf-fa-cube
+	"Claude":             "\U000F0760", // nf-md-brain-outline
+	"VS Code":            "\ue70c",     // nf-dev-visualstudio
+	"Neovim":             "\ue6ae",     // nf-dev-vim
+	"Zed":                "\uf489",     // nf-md-alpha-z-box (approx)
+	"Windsurf":           "\uf72c",     // nf-md-waves (approx)
+	"Cline":              "\ue795",     // nf-dev-terminal (generic CLI)
+	"Continue":           "\uf138",     // nf-fa-chevron-circle-right
+	"Aider":              "\uf013",     // nf-fa-cog
 }
 
 // genericIcon is the fallback for unknown tool names.
@@ -37,13 +37,19 @@ var iconAccentColors = []lipgloss.Color{
 	lipgloss.Color("#A8F456"), // lime
 }
 
+// ToolGlyph returns the raw Nerd Font glyph for the given tool name.
+func ToolGlyph(toolName string) string {
+	glyph, ok := ToolIcons[toolName]
+	if !ok {
+		return genericIcon
+	}
+	return glyph
+}
+
 // ToolIcon returns the Nerd Font glyph for the given tool name,
 // styled with a deterministic accent color derived from the name.
 func ToolIcon(toolName string) string {
-	glyph, ok := ToolIcons[toolName]
-	if !ok {
-		glyph = genericIcon
-	}
+	glyph := ToolGlyph(toolName)
 	color := accentColorFor(toolName)
 	return lipgloss.NewStyle().Foreground(color).Render(glyph)
 }

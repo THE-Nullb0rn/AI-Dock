@@ -9,6 +9,7 @@ type Variant struct {
 }
 
 type Tool struct {
-	Name     string    `json:"name"`
-	Variants []Variant `json:"variants"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Variants    []Variant `json:"variants"`
 }
